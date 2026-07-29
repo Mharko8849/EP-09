@@ -1,0 +1,88 @@
+---
+title: "EP09"
+author: "Equipo 1"
+date: "2026-07-29"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, warning = FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+paquetes <- c("boot", "car", "caret", "ggfortify", "ggplot2", 
+  "ggpubr", "grid", "gridExtra", "gmodels", "ez", "emmeans", "infer", 
+  "kableExtra", "Hmisc", "knitr", "leaps", "lmtest", "lsmeans", 
+  "multcomp", "nlme", "plyr", "pROC", "purrr", "pwr", "readr", 
+  "scatterplot3d", "psych", "TeachingDemos", "tibble", "tidyr","nortest", "dplyr", "MASS", "WRS2")
+
+install_if_missing <- function(p) {
+  if (!require(p, character.only = TRUE)) {
+    install.packages(p, repos = "http://cran.us.r-project.org")
+    library(p, character.only = TRUE)
+  }
+}
+invisible(sapply(paquetes, install_if_missing))
+library(conflicted)
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::mutate)
+conflicts_prefer(dplyr::pmap())
+conflicts_prefer(dplyr::summarise())
+```
+
+
+## 1. Definir la semilla a utilizar, que corresponde a los últimos cuatro dígitos del RUN (sin considerar el dígito verificador) del integrante de menor edad del equipo.
+
+```{r}
+# Los últimos 4 números de RUT del integrante de menor edad en el equipo es 5622, por lo que se define la semilla 5622
+
+set.seed(5622)
+
+```
+
+## 2. Seleccionar una muestra aleatoria de 100 mujeres (si la semilla es un número par) o 100 hombres (si la semilla es impar), y separar 70 casos para trabajar en la construcción de modelos y 30 para su evaluación en datos no vistos.
+
+```{r}
+datos <- read.csv2("EP09 Datos.csv")
+
+datos_filtrados <- datos |>
+  filter(Gender == "0")
+
+muestra <- datos_filtrados |> slice_sample(n = 100)
+
+cat ("Observaciones postfiltrado:", nrow(muestra), "\n")
+```
+
+## 3. Seleccionar de forma aleatoria ocho posibles variables predictoras. 
+```{r}
+
+```
+
+## 4. Seleccionar, de las otras variables, una que el equipo considere que podría ser útil para predecir la variable Peso (sin considerar la estatura), justificando bien esta selección.  
+
+```{r}
+
+```
+
+## 5. Usando el entorno R y paquetes estándares1, construir un modelo de regresión lineal simple con el predictor seleccionado en el paso anterior.  
+
+```{r}
+
+```
+
+## 6. Usando herramientas estándares1 para la exploración de modelos del entorno R, buscar entre dos y cinco predictores de entre las variables seleccionadas al azar en el punto 3, para agregar al modelo de regresión lineal simple obtenido en el paso 5.  
+
+```{r}
+
+```
+
+## 7. Evaluar la bondad de ajuste (incluyendo el análisis de casos atípicos y casos influyentes) y la generalidad (condiciones para RLM) de los modelos y “arreglarlos” en caso de que presenten algún problema.  
+
+```{r}
+
+```
+
+## 8. Evaluar el poder predictivo del modelo con los datos no utilizados para construirlo.  
+
+```{r}
+
+```
