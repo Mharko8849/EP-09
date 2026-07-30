@@ -29,8 +29,11 @@ conflicts_prefer(dplyr::pmap())
 conflicts_prefer(dplyr::summarise())
 ```
 
+<br>
+---
+<br>
 
-## 1. Definir la semilla a utilizar, que corresponde a los últimos cuatro dígitos del RUN (sin considerar el dígito verificador) del integrante de menor edad del equipo.
+#### **1. Definir la semilla a utilizar, que corresponde a los últimos cuatro dígitos del RUN (sin considerar el dígito verificador) del integrante de menor edad del equipo.**
 
 ```{r}
 # Los últimos 4 números de RUT del integrante de menor edad en el equipo es 5622, por lo que se define la semilla 5622
@@ -39,7 +42,13 @@ set.seed(5622)
 
 ```
 
-## 2. Seleccionar una muestra aleatoria de 100 mujeres (si la semilla es un número par) o 100 hombres (si la semilla es impar), y separar 70 casos para trabajar en la construcción de modelos y 30 para su evaluación en datos no vistos.
+<br>
+
+---
+
+<br>
+
+#### **2. Seleccionar una muestra aleatoria de 100 mujeres (si la semilla es un número par) o 100 hombres (si la semilla es impar), y separar 70 casos para trabajar en la construcción de modelos y 30 para su evaluación en datos no vistos.**
 
 ```{r}
 datos <- read.csv2("EP09 Datos.csv")
@@ -49,39 +58,120 @@ datos_filtrados <- datos |>
 
 muestra <- datos_filtrados |> slice_sample(n = 100)
 
-cat ("Observaciones postfiltrado:", nrow(muestra), "\n")
+# Separamos los 70 casos para construir el modelo y 30 para evaluarlo
+indices_entrenamiento <- sample(1:100, 70)
+entrenamiento <- muestra[indices_entrenamiento, ]
+prueba <- muestra[-indices_entrenamiento, ]
+
+cat("Observaciones postfiltrado:", nrow(muestra), "\n")
+cat("Entrenamiento:", nrow(entrenamiento), " | Prueba:", nrow(prueba), "\n")
 ```
 
-## 3. Seleccionar de forma aleatoria ocho posibles variables predictoras. 
+<br>
+
+---
+
+<br>
+
+#### **3. Seleccionar de forma aleatoria ocho posibles variables predictoras.** 
+```{r}
+# Variables candidatas: se excluyen Peso (respuesta), Estatura (excluida por enunciado) y Género (constante dentro de la muestra, ya que se trabaja con un solo sexo)
+
+set.seed(5622)
+
+variables_candidatas <- setdiff(colnames(datos), c("Weight", "Height", "Gender"))
+
+
+predictores_azar <- sample(variables_candidatas, 8)
+predictores_azar
+
+```
+
+<br>
+
+---
+
+<br>
+
+#### **4. Seleccionar, de las otras variables, una que el equipo considere que podría ser útil para predecir la variable Peso (sin considerar la estatura), justificando bien esta selección.**  
+
+```{r}
+
+# Variables restantes (ni sorteadas, ni excluidas por enunciado)
+otras_variables <- setdiff(variables_candidatas, predictores_azar)
+otras_variables
+
+# Evaluamos correlación de cada una con Weight en el set de entrenamiento
+correlaciones <- sapply(entrenamiento[otras_variables], function(x) cor(x, entrenamiento$Weight))
+sort(correlaciones, decreasing = TRUE)
+
+```
+
+Considerando que de las 14 variables restantes que no fueron sorteadas en el punto anterior, ni excluidas por el enunciado y el cálculo de la correlación lineal de cada una con la variable "Weigth usando los 70 casos de la muestra de entrenamiento, se escogió la variable Thigh.Girth (Grosor promedio de ambos muslos). La razón de esto es que presentó la correlación mas alta con un r=0.828.
+Esta elección de sustenta por este criterio estadístico.Por este motivo, se selecciona Thigh.Girth como el predictor a usar en el modelo de regresión lineal simple (RLS) del punto 5.
+
+
+<br>
+
+---
+
+<br>
+
+#### **5. Usando el entorno R y paquetes estándares1, construir un modelo de regresión lineal simple con el predictor seleccionado en el paso anterior.**
+```{r}
+modelo_rls <- lm(Weight ~ Thigh.Girth, data = entrenamiento)
+summary(modelo_rls)
+```
+
+```{r}
+# Gráfico de dispersión con la recta de regresión ajustada
+ggplot(entrenamiento, aes(x = Thigh.Girth, y = Weight)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "steelblue") +
+  labs(title = "Relación entre Weight y Thigh.Girth",
+       x = "Grosor promedio de muslos (cm)",
+       y = "Peso (kg)") +
+  theme_minimal()
+```
+
+El modelo ajustado fue  $Weight = -25.67 + 1.4915 * Thigh.Girth$. El coeficiente de Thigh.Girth es significado dado que $p < 2e-16$, esto nos indica que por cada centímetro adicional de grosor promedio de muslos, el pero esperado aumenta en 1.4915 kg, con una lecación positiva.
+El modelo obtuvo un $R^2$ ajustado de 0.6814, esto nos indica que el promedio de los muslos explica aproximadamente un 68% de la variabilidad del peso en la muestra de entrenamiento. 
+El error estándar residual es de 4.786 kg,osea que da una idea de que la magnitud típica de error al predecir el peso con este modelo simple.
+Por ultimo el gráfico de dispersión con la recta ajustada nos confirma visualmente una relación lineal fuerte y consistente entre ambas variables, sin una señal de curvatura evidente como tampoco de heterocedasticidad marcada. 
+Con todos estos resultados, podemos rescatar que el predictor Thigh.Girth es un comienzo favorable para la extencion del modelo a una regresión lineal múltiple (RLM) en el sigueinte paso.
+
+<br>
+
+---
+
+<br>
+
+#### **6. Usando herramientas estándares1 para la exploración de modelos del entorno R, buscar entre dos y cinco predictores de entre las variables seleccionadas al azar en el punto 3, para agregar al modelo de regresión lineal simple obtenido en el paso 5.**
+
 ```{r}
 
 ```
 
-## 4. Seleccionar, de las otras variables, una que el equipo considere que podría ser útil para predecir la variable Peso (sin considerar la estatura), justificando bien esta selección.  
+
+<br>
+
+---
+
+<br>
+
+#### **7. Evaluar la bondad de ajuste (incluyendo el análisis de casos atípicos y casos influyentes) y la generalidad (condiciones para RLM) de los modelos y “arreglarlos” en caso de que presenten algún problema.**
 
 ```{r}
 
 ```
 
-## 5. Usando el entorno R y paquetes estándares1, construir un modelo de regresión lineal simple con el predictor seleccionado en el paso anterior.  
+<br>
 
-```{r}
+---
 
-```
+<br>
 
-## 6. Usando herramientas estándares1 para la exploración de modelos del entorno R, buscar entre dos y cinco predictores de entre las variables seleccionadas al azar en el punto 3, para agregar al modelo de regresión lineal simple obtenido en el paso 5.  
-
-```{r}
-
-```
-
-## 7. Evaluar la bondad de ajuste (incluyendo el análisis de casos atípicos y casos influyentes) y la generalidad (condiciones para RLM) de los modelos y “arreglarlos” en caso de que presenten algún problema.  
-
-```{r}
-
-```
-
-## 8. Evaluar el poder predictivo del modelo con los datos no utilizados para construirlo.  
+#### **8. Evaluar el poder predictivo del modelo con los datos no utilizados para construirlo.**
 
 ```{r}
 
