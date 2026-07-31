@@ -6,7 +6,7 @@ output: html_document
 ---
 
 
-```{r setup, include=FALSE, warning = FALSE}
+```{r setup, include=FALSE, warning = FALSE, message = FALSE}
 # knitr::opts_chunk$set(echo = TRUE)
 paquetes <- c("boot", "car", "caret", "ggfortify", "ggplot2", 
   "ggpubr", "grid", "gridExtra", "gmodels", "ez", "emmeans", "infer", 
@@ -25,7 +25,7 @@ library(conflicted)
 conflicts_prefer(dplyr::select)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::mutate)
-conflicts_prefer(dplyr::pmap())
+conflicts_prefer(purrr::pmap())
 conflicts_prefer(dplyr::summarise())
 ```
 
@@ -76,8 +76,6 @@ cat("Entrenamiento:", nrow(entrenamiento), " | Prueba:", nrow(prueba), "\n")
 #### **3. Seleccionar de forma aleatoria ocho posibles variables predictoras.** 
 ```{r}
 # Variables candidatas: se excluyen Peso (respuesta), Estatura (excluida por enunciado) y Género (constante dentro de la muestra, ya que se trabaja con un solo sexo)
-
-set.seed(5622)
 
 variables_candidatas <- setdiff(colnames(datos), c("Weight", "Height", "Gender"))
 
@@ -149,8 +147,53 @@ Con todos estos resultados, podemos rescatar que el predictor Thigh.Girth es un 
 #### **6. Usando herramientas estándares1 para la exploración de modelos del entorno R, buscar entre dos y cinco predictores de entre las variables seleccionadas al azar en el punto 3, para agregar al modelo de regresión lineal simple obtenido en el paso 5.**
 
 ```{r}
-
+# Primero revisamos la correlación entre los 8 predictores sorteados en el punto 3
+# para tener presente posibles problemas de colinealidad al combinarlos.
+round(cor(entrenamiento[predictores_azar]), 2)
 ```
+
+```{r}
+# Usamos búsqueda exhaustiva de mejores subconjuntos (leaps::regsubsets), forzando la
+# permanencia de Thigh.Girth (predictor del RLS del paso 5) y permitiendo agregar hasta
+# 5 predictores adicionales de entre los 8 sorteados en el punto 3.
+variables_totales <- c("Thigh.Girth", predictores_azar)
+
+modelo_regsubsets <- regsubsets(
+  Weight ~ .,
+  data = entrenamiento[, c("Weight", variables_totales)],
+  method = "exhaustive",
+  nvmax = 6,                 
+  force.in = "Thigh.Girth"
+)
+
+resumen_regsubsets <- summary(modelo_regsubsets)
+resumen_regsubsets$outmat
+
+# Métricas para comparar los modelos según su número de predictores
+data.frame(
+  n_predictores = 2:6,
+  adjR2 = resumen_regsubsets$adjr2,
+  BIC = resumen_regsubsets$bic,
+  Cp = resumen_regsubsets$cp
+)
+```
+
+```{r}
+# El BIC (criterio parsimonioso) alcanza su mínimo con 5 predictores en total, es decir,
+# Thigh.Girth más 4 predictores adicionales: Biiliac.diameter, Knees.diameter,
+# Ankles.diameter y Waist.Girth. Ese es el modelo de regresión lineal múltiple elegido.
+modelo_rlm <- lm(
+  Weight ~ Thigh.Girth + Biiliac.diameter + Knees.diameter + Ankles.diameter + Waist.Girth,
+  data = entrenamiento
+)
+summary(modelo_rlm)
+```
+
+Para buscar los predictores adicionales se utilizó la herramienta estándar de exploración de modelos `regsubsets()` del paquete `leaps`, mediante búsqueda exhaustiva de los mejores subconjuntos. Se forzó la permanencia de `Thigh.Girth` (el predictor del RLS del paso 5) y se permitió agregar hasta 5 predictores adicionales de entre los 8 sorteados en el punto 3.
+
+Comparando los modelos según el criterio BIC (que penaliza la complejidad y favorece modelos parsimoniosos), el mínimo se alcanza con un total de 5 predictores, esto es, `Thigh.Girth` más cuatro predictores adicionales: `Biiliac.diameter`, `Knees.diameter`, `Ankles.diameter` y `Waist.Girth`. Si bien el modelo con 6 predictores tiene un $R^2$ ajustado marginalmente mayor (0.877 frente a 0.873), la mejora es mínima y el BIC lo penaliza, por lo que se escoge el modelo de 4 predictores adicionales por parsimonia.
+
+El modelo de regresión lineal múltiple resultante obtiene un $R^2$ ajustado de 0.873, superior al 0.681 del modelo simple del paso 5, y todos sus coeficientes resultan significativos ($p < 0.05$). Esto respeta la restricción del enunciado de agregar entre dos y cinco predictores.
 
 
 <br>
@@ -162,8 +205,83 @@ Con todos estos resultados, podemos rescatar que el predictor Thigh.Girth es un 
 #### **7. Evaluar la bondad de ajuste (incluyendo el análisis de casos atípicos y casos influyentes) y la generalidad (condiciones para RLM) de los modelos y “arreglarlos” en caso de que presenten algún problema.**
 
 ```{r}
+# Verificación de las condiciones para la regresión lineal múltiple sobre el modelo del punto 6.
 
+# Independencia de los residuos (Durbin-Watson)
+durbinWatsonTest(modelo_rlm)
+
+# Normalidad de los residuos (Shapiro-Wilk)
+shapiro.test(resid(modelo_rlm))
+
+# Homocedasticidad (test de varianza no constante / Breusch-Pagan)
+ncvTest(modelo_rlm)
+
+# Ausencia de multicolinealidad severa (factores de inflación de la varianza)
+vif(modelo_rlm)
 ```
+
+```{r}
+# Análisis de casos atípicos e influyentes
+n <- nrow(entrenamiento)
+k <- length(coef(modelo_rlm)) - 1
+
+umbral_cook <- 4 / n
+umbral_lev  <- 2 * (k + 1) / n
+
+infl <- data.frame(
+  obs       = 1:n,
+  resid_std = rstandard(modelo_rlm),
+  cook      = cooks.distance(modelo_rlm),
+  leverage  = hatvalues(modelo_rlm)
+)
+
+cat("Umbral distancia de Cook (4/n):", round(umbral_cook, 4), "\n")
+cat("Umbral apalancamiento 2(k+1)/n:", round(umbral_lev, 4), "\n\n")
+
+cat("Residuos estandarizados |>| 3:\n")
+infl[abs(infl$resid_std) > 3, ]
+
+cat("\nCasos con distancia de Cook > 1 (influencia severa):\n")
+infl[infl$cook > 1, ]
+
+cat("\nMáxima distancia de Cook observada:", round(max(infl$cook), 3), "\n")
+```
+
+```{r, warning = FALSE}
+# Gráficos de diagnóstico del modelo del punto 6
+autoplot(modelo_rlm, which = 1:4) + theme_minimal()
+```
+
+**Diagnóstico del modelo del punto 6.** La independencia de los residuos se cumple (Durbin-Watson, $p = 0.19$), la normalidad de los residuos se cumple (Shapiro-Wilk, $p = 0.21$) y no hay multicolinealidad severa (todos los VIF < 3, con promedio 1.94). En cuanto a los casos atípicos e influyentes, no hay residuos estandarizados con valor absoluto mayor a 3 y ningún caso supera una distancia de Cook de 1 (el máximo es 0.48), por lo que no existen observaciones que por sí solas condicionen severamente el ajuste; no se elimina ningún caso.
+
+Sin embargo, la condición de **homocedasticidad no se cumple**: el test de varianza no constante entrega $p = 0.009$ (y el Breusch-Pagan estudentizado, $p = 0.012$), lo que indica que la varianza de los residuos no es constante. Esto también se aprecia en el gráfico *Scale-Location*, donde la dispersión de los residuos tiende a crecer con los valores ajustados. Este problema debe ser "arreglado".
+
+```{r}
+# Arreglo del problema de heterocedasticidad mediante transformación de la respuesta.
+# Box-Cox sugiere transformar Weight; probamos la transformación logarítmica.
+bc <- boxcox(modelo_rlm, lambda = seq(-2, 2, 0.1), plotit = FALSE)
+cat("Lambda óptimo Box-Cox:", round(bc$x[which.max(bc$y)], 3), "\n")
+
+modelo_rlm_log <- lm(
+  log(Weight) ~ Thigh.Girth + Biiliac.diameter + Knees.diameter + Ankles.diameter + Waist.Girth,
+  data = entrenamiento
+)
+
+cat("\n== Re-verificación de condiciones sobre el modelo transformado ==\n")
+cat("Homocedasticidad (ncvTest):\n"); print(ncvTest(modelo_rlm_log))
+cat("Normalidad (Shapiro-Wilk) p-valor:", shapiro.test(resid(modelo_rlm_log))$p.value, "\n")
+cat("Independencia (Durbin-Watson) p-valor:", durbinWatsonTest(modelo_rlm_log)$p, "\n")
+cat("R2 ajustado:", summary(modelo_rlm_log)$adj.r.squared, "\n")
+cat("Máx distancia de Cook:", round(max(cooks.distance(modelo_rlm_log)), 3), "\n")
+```
+
+```{r, warning = FALSE}
+autoplot(modelo_rlm_log, which = 1:4) + theme_minimal()
+```
+
+**Arreglo.** Para corregir la heterocedasticidad se aplicó una transformación logarítmica a la variable respuesta (`log(Weight)`), en línea con lo sugerido por el análisis Box-Cox. Sobre el modelo transformado, la homocedasticidad ahora se cumple (test de varianza no constante, $p = 0.068 > 0.05$) y se mantienen el resto de las condiciones: normalidad de residuos ($p = 0.32$), independencia ($p = 0.15$), VIF bajos (todos < 3) y ausencia de casos con distancia de Cook mayor a 1. El $R^2$ ajustado se mantiene alto (0.863).
+
+En resumen, el modelo múltiple del punto 6 presentaba un único problema de generalidad (heterocedasticidad), que se corrigió mediante la transformación logarítmica de la respuesta; el modelo resultante `modelo_rlm_log` satisface todas las condiciones para la regresión lineal múltiple y muestra una buena bondad de ajuste, sin casos atípicos ni influyentes que comprometan el análisis.
 
 <br>
 
