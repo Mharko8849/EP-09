@@ -126,7 +126,7 @@ El modelo ajustado fue  $Weight = -25.67 + 1.4915 * Thigh.Girth$. El coeficiente
 .
 El modelo obtuvo un $R^2$ ajustado de 0.6814, esto nos indica que el promedio de los muslos explica aproximadamente un 68% de la variabilidad del peso en la muestra de entrenamiento. 
 El error estándar residual es de 4.786 kg, osea que da una idea de que la magnitud típica de error al predecir el peso con este modelo simple.
-Por ultimo el gráfico de dispersión con la recta ajustada nos confirma visualmente una relación lineal fuerte y consistente entre ambas variables, sin una señal de curvatura evidente. 
+Por último el gráfico de dispersión con la recta ajustada nos confirma visualmente una relación lineal fuerte y consistente entre ambas variables, sin una señal de curvatura evidente. 
 Con todos estos resultados, podemos rescatar que el predictor Thigh.Girth es un comienzo favorable para la extencion del modelo a una regresión lineal múltiple (RLM) en el siguiente paso.
 
 <br>
