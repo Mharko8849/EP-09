@@ -95,8 +95,8 @@ sort(correlaciones, decreasing = TRUE)
 
 ```
 
-Considerando que de las 14 variables restantes que no fueron sorteadas en el punto anterior, ni excluidas por el enunciado y el cálculo de la correlación lineal de cada una con la variable "Weigth usando los 70 casos de la muestra de entrenamiento, se escogió la variable Thigh.Girth (Grosor promedio de ambos muslos). La razón de esto es que presentó la correlación mas alta con un r=0.828.
-Esta elección de sustenta por este criterio estadístico.Por este motivo, se selecciona Thigh.Girth como el predictor a usar en el modelo de regresión lineal simple (RLS) del punto 5. Además, tiene sentido esta variable debido a que los muslos son una de las zonas más voluminosas del cuerpo humano, especialmente en mujeres, por lo que es de esperar de que refleja directamente el peso corporal.
+Considerando que de las 14 variables restantes que no fueron sorteadas en el punto anterior, ni excluidas por el enunciado y el cálculo de la correlación lineal de cada una con la variable "Weigth usando los 70 casos de la muestra de entrenamiento, se escogió la variable Thigh.Girth (Grosor promedio de ambos muslos). La razón de esto es que presentó la correlación más alta con un r=0.828.
+Esta elección se sustenta por este criterio estadístico. Por este motivo, se selecciona Thigh.Girth como el predictor a usar en el modelo de regresión lineal simple (RLS) del punto 5. Además, tiene sentido esta variable debido a que los muslos son una de las zonas más voluminosas del cuerpo humano, especialmente en mujeres, por lo que es de esperar de que refleja directamente el peso corporal.
 
 
 <br>
@@ -122,9 +122,10 @@ ggplot(entrenamiento, aes(x = Thigh.Girth, y = Weight)) +
   theme_minimal()
 ```
 
-El modelo ajustado fue  $Weight = -25.67 + 1.4915 * Thigh.Girth$. El coeficiente de Thigh.Girth es significado dado que $p < 2e-16$, esto nos indica que por cada centímetro adicional de grosor promedio de muslos, el pero esperado aumenta en 1.4915 kg, con una lecación positiva.
+El modelo ajustado fue  $Weight = -25.67 + 1.4915 * Thigh.Girth$. El coeficiente de Thigh.Girth es significativo dado que $p < 2e-16$, esto nos indica que por cada centímetro adicional de grosor promedio de muslos, el peso esperado aumenta en 1.4915 kg
+.
 El modelo obtuvo un $R^2$ ajustado de 0.6814, esto nos indica que el promedio de los muslos explica aproximadamente un 68% de la variabilidad del peso en la muestra de entrenamiento. 
-El error estándar residual es de 4.786 kg,osea que da una idea de que la magnitud típica de error al predecir el peso con este modelo simple.
+El error estándar residual es de 4.786 kg, osea que da una idea de que la magnitud típica de error al predecir el peso con este modelo simple.
 Por ultimo el gráfico de dispersión con la recta ajustada nos confirma visualmente una relación lineal fuerte y consistente entre ambas variables, sin una señal de curvatura evidente. 
 Con todos estos resultados, podemos rescatar que el predictor Thigh.Girth es un comienzo favorable para la extencion del modelo a una regresión lineal múltiple (RLM) en el siguiente paso.
 
@@ -178,7 +179,7 @@ print(summary(modelo_rlm))
 
 Para buscar los predictores adicionales se utilizó la herramienta estándar de exploración de modelos `regsubsets()` del paquete `leaps`, mediante búsqueda exhaustiva de los mejores subconjuntos. Se forzó la permanencia de `Thigh.Girth` (el predictor del RLS del paso 5) y se permitió agregar hasta 5 predictores adicionales de entre los 8 sorteados en el punto 3.
 
-Comparando los modelos según el criterio BIC (que penaliza la complejidad y favorece modelos parsimoniosos), el mínimo se alcanza con un total de 5 predictores, esto es, `Thigh.Girth` más cuatro predictores adicionales: `Biiliac.diameter`, `Knees.diameter`, `Ankles.diameter` y `Waist.Girth`. Si bien el modelo con 6 predictores tiene un $R^2$ ajustado marginalmente mayor (0.877 frente a 0.873), la mejora es mínima y el BIC lo penaliza, por lo que se escoge el modelo de 4 predictores adicionales por parsimonia.
+Comparando los modelos según el criterio BIC (que penaliza la complejidad y favorece modelos parsimoniosos), el mínimo se alcanza con un total de 5 predictores, esto es, `Thigh.Girth` más cuatro predictores adicionales: Chest.Girth, Calf.Maximum.Girth, Hip.Girth y Wrists.diameter. Si bien el modelo con 6 predictores tiene un $R^2$ ajustado marginalmente mayor (0.9245 frente a 0.9233), la mejora es mínima y el BIC lo penaliza, por lo que se escoge el modelo de 4 predictores adicionales por parsimonia.
 
 El modelo de regresión lineal múltiple resultante obtiene un $R^2$ ajustado de 0.923, superior al 0.681 del modelo simple del paso 5. Esto respeta la restricción del enunciado de agregar entre dos y cinco predictores. Cabe destacar que Thigh.Girth deja de ser significativo al incorporar los demás predictores (p=0,688), esto se analizará a continuación. 
 
