@@ -206,7 +206,7 @@ cat("Máxima distancia de Cook:", round(max(cooks.distance(modelo_rls)), 3), " |
 autoplot(modelo_rls, which = 1:4) + theme_minimal()
 ```
 
-Diagnóstico del RLS: El modelo explica un 68,1% de la variabilidad del peso y la reducción respecto del modelo nulo es significativa (F(1, 68) = 617,3; p < 0,001). Los residuos son normales (p = 0,603) e independientes (p = 0,916), pero no homocedásticos (p = 0,001), y hay un caso con distancia de Cook de 1,613, muy sobre el umbral de 0,700. Se trata de la observación 80: una mujer con `Thigh.Girth` = 75,7 cm (el máximo de la muestra) y 73,2 kg, bastante menos de lo que predice el modelo. Ambos problemas apuntan al mismo caso.
+Diagnóstico del RLS: El modelo explica un 68,1% de la variabilidad del peso y la reducción respecto del modelo nulo es significativa (F(1, 68) = 617,3; p < 0,001). Los residuos son normales (p = 0,603) e independientes (p = 0,874), pero no homocedásticos (p = 0,001), y hay un caso con distancia de Cook de 1,613, muy sobre el umbral de 0,700. Se trata de la observación 80: una mujer con `Thigh.Girth` = 75,7 cm (el máximo de la muestra) y 73,2 kg, bastante menos de lo que predice el modelo. Ambos problemas apuntan al mismo caso.
 
 ```{r}
 # ARREGLO: se elimina el único caso con influencia problemática. La decisión se basa en el análisis previo.
@@ -220,7 +220,7 @@ print(shapiro.test(resid(modelo_rls_final)))
 cat("Máxima distancia de Cook:", round(max(cooks.distance(modelo_rls_final)), 3), "\n")
 ```
 
-Arreglo del RLS: Eliminado ese caso (1 de 70), el modelo cumple todas las condiciones: residuos normales (p = 0,668), homocedásticos (p = 0,200) e independientes (p = 0,824), con máxima distancia de Cook de 0,277. Además mejora el ajuste: el $R^2$ ajustado sube de 0,681 a 0,724 y el error estándar residual baja de 4,79 a 4,41 kg.
+Arreglo del RLS: Eliminado ese caso (1 de 70), el modelo cumple todas las condiciones: residuos normales (p = 0,668), homocedásticos (p = 0,200) e independientes (p = 0,792), con máxima distancia de Cook de 0,277. Además mejora el ajuste: el $R^2$ ajustado sube de 0,681 a 0,724 y el error estándar residual baja de 4,79 a 4,41 kg.
 
 ```{r}
 # Se reajusta el RLM sin el caso influyente y se evalúa si todos sus predictores siguen aportando al ajuste.
@@ -229,7 +229,6 @@ modelo_rlm_final <- update(modelo_rlm_limpio, . ~ . - Wrists.diameter)
 print(anova(modelo_rlm_final, modelo_rlm_limpio))
 print(summary(modelo_rlm_final))
 
-set.seed(19)
 print(durbinWatsonTest(modelo_rlm_final))
 print(ncvTest(modelo_rlm_final))
 print(shapiro.test(resid(modelo_rlm_final)))
@@ -239,7 +238,7 @@ cat("Máxima distancia de Cook:", round(max(cooks.distance(modelo_rlm_final)), 3
 autoplot(modelo_rlm_final, which = 1:4) + theme_minimal()
 ```
 
-Diagnóstico y arreglo del RLM: Al reajustar el modelo sin el caso influyente, `Wrists.diameter` deja de aportar al ajuste (F(1, 63) = 3,123; p = 0,082), por lo que se elimina por parsimonia. El modelo final, con cuatro predictores, cumple todas las condiciones: residuos normales (p = 0,316), homocedásticos (p = 0,430) e independientes (p = 0,390), sin patrones sistemáticos en los gráficos de residuos, y con máxima distancia de Cook de 0,218 frente a un umbral de 0,880. Consigue un $R^2$ ajustado de 0,920 y un error estándar residual de 2,37 kg, con 69 casos para 4 predictores (más de 17 por predictor).
+Diagnóstico y arreglo del RLM: Al reajustar el modelo sin el caso influyente, `Wrists.diameter` deja de aportar al ajuste (F(1, 63) = 3,123; p = 0,082), por lo que se elimina por parsimonia. El modelo final, con cuatro predictores, cumple todas las condiciones: residuos normales (p = 0,316), homocedásticos (p = 0,430) e independientes (p = 0,376), sin patrones sistemáticos en los gráficos de residuos, y con máxima distancia de Cook de 0,218 frente a un umbral de 0,880. Consigue un $R^2$ ajustado de 0,920 y un error estándar residual de 2,37 kg, con 69 casos para 4 predictores (más de 17 por predictor).
 
 Hay que notar que `Thigh.Girth` y `Hip.Girth` presentan VIF cercanos a 6, dentro del rango donde la multicolinealidad es preocupante, porque ambas circunferencias miden esencialmente la misma región anatómica (r = 0,90). Por eso `Thigh.Girth` deja de ser significativo en presencia de `Hip.Girth` (p = 0,928). Se mantiene porque el enunciado pide extender el modelo de RLS del paso 5 y porque ningún VIF supera 10, asumiendo el riesgo de que sus coeficientes individuales no sean interpretables por separado.
 
