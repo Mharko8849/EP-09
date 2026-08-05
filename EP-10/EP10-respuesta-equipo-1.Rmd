@@ -1,0 +1,115 @@
+---
+title: "EP10: Regresión logística"
+subtitle: "Inferencia y modelos estadísticos"
+author: "Equipo 1"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    df_print: kable
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = TRUE,
+                      fig.width = 8, fig.height = 5, fig.align = "center")
+```
+
+```{r librerias, message = FALSE, warning = FALSE}
+library(dplyr)
+library(tidyr)
+library(ggpubr)
+library(caret)
+library(pROC)
+library(car)
+```
+
+## Datos
+```{r}
+semilla       <- 5622   # la misma semilla usada en el EP09
+
+datos <- read.csv2("EP09 Datos.csv", stringsAsFactors = FALSE)
+
+cat(sprintf("%d observaciones, %d variables\n", nrow(datos), ncol(datos)))
+print(colnames(datos))
+```
+
+Para este ejercicio usaremos los datos de medidas anatómicas recolectados por Heinz et al. (2003) que ya conocimos en el ejercicio práctico anterior (disponibles en el archivo "EP09 Datos.csv"). Como en este case se requiere de una variable dicotómica, vamos a realizar lo siguiente:
+
+  1. El equipo crea la variable IMC (índice de masa corporal) como el peso de una persona (en kilogramos) dividida por el cuadrado de su estatura (en metros).
+  
+  2. Si bien esta variable se usa para clasificar a las personas en varias clases de estado nutricional (bajo peso, normal, sobrepeso, obesidad, obesidad mórbida), para      efectos de este ejercicio, usaremos dos clases: sobrepeso (IMC ≥ 23,2) y no sobrepeso (IMC < 23,2).
+  
+  3. El equipo crea la variable dicotómica EN (estado nutricional) de acuerdo al valor de IMC de cada persona.
+  
+```{r}
+datos <- datos |>
+  # Creamos la variable IMC, pasando cm a metro y usando la formula clásica. Luego agregamos la var dicotomia EN.
+  mutate(IMC = Weight / (Height / 100) ** 2, EN  = factor(ifelse(IMC >= 23.2, "sobrepeso", "no_sobrepeso"), levels = c("no_sobrepeso", "sobrepeso")))
+
+print(head(datos |> select(Age, Weight, Height, Gender, IMC, EN)))
+```
+Se observa que la creación de las columnas y sus valores son satisfactorios.
+
+Ahora podemos construir un modelo de regresión logística para predecir la variable EN, de acuerdo con las siguientes instrucciones:
+
+## 1.
+
+#### Asegurando reproducibilidad, seleccionar una muestra de 150 mujeres (si su n° de equipo es un número par) o 150 hombres (si su n° de equipo es impar), asegurando que la mitad tenga estado nutricional “sobrepeso” y la otra mitad “no sobrepeso” en cada caso. Dividir esta muestra en dos conjuntos: los datos de 100 personas (50 con EN “sobrepeso”) para utilizar en la construcción de los modelos y 50 personas (25 con EN “sobrepeso”) para poder evaluarlos.
+```{r}
+#Equipos impares trabajan con hombres, pares con mujeres. Siendo equipo 1 trabajamos con mujeres (0 en columna Gender)
+genero <- 0 #(mujeres)
+datos_mujeres<- datos |> filter(Gender == genero)
+print(table(datos_mujeres[["EN"]]))   # verificar que hay al menos 75 de cada clase
+```
+
+```{r}
+semilla       <- 5622   # la misma semilla usada en el EP09
+
+#mitad con sobrepeso
+muestra_sp <- datos_mujeres |> filter(EN == "sobrepeso")    |> slice_sample(n = 75)
+#mitad sin sobrepeso
+muestra_ns <- datos_mujeres |> filter(EN == "no_sobrepeso") |> slice_sample(n = 75)
+
+#Conjunto 1: datos de entrenamiento, 100 personas (50 con sobrepeso, 50 sin sobrepeso)
+datos_ent <- rbind(muestra_sp[1:50, ], muestra_ns[1:50, ])
+datos_ent <- datos_ent |> slice_sample(prop = 1)        #ESTO MEZCLA LAS FILAS
+#Conjunto 2: datos de evaluacion (25 con sobrepeso, 25 sin sobrepeso)
+datos_pru <- rbind(muestra_sp[51:75, ],muestra_ns[51:75, ])
+datos_pru <- datos_pru |> slice_sample(prop = 1)
+
+
+cat("Entrenamiento:\n"); print(table(datos_ent[["EN"]]))
+cat("Prueba:\n");        print(table(datos_pru[["EN"]]))
+
+```
+
+## 2.
+
+#### Recordar las ocho posibles variables predictoras seleccionadas de forma aleatoria en el ejercicio anterior.
+
+```{r}
+# variables predictoras seleccionadas al azar en el EP09
+predictores <- c("Chest.Girth", "Bicep.Girth", "Calf.Maximum.Girth", "Hip.Girth", "Ankles.diameter", "Bitrochanteric.diameter",
+      "Knees.diameter", "Wrists.diameter")
+```
+
+## 3.
+
+#### Seleccionar, de las otras variables, una que el equipo considere que podría ser útil para predecir la clase EN, justificando bien esta selección (idealmente con literatura).
+
+
+En primer lugar, pensamos en la circunferencia de la cintura como un buen predictor del ICM. Para comprobar nuestra decisión investigamos en la literaruta, nos encontramos con varios infogramas y artículos y terminamos en el siguiente artículo de la OMS que confirma nuestra selección:
+
+- https://www.who.int/publications/i/item/9789241501491 (Waist circumference and waist-hip ratio: report of a WHO expert consultation, 2008)
+Nos dice que: "Waist circumference and waist–hip ratio were correlated with BMI, but the level of association varied, suggesting that these measures may provide different information and thus may not be interchangeable." Esto indica que se observó un nivel de correlación, pero nada confirmado.
+
+Luego tenemos artículos como:
+- https://www.who.int/en/news-room/fact-sheets/detail/obesity-and-overweight?utm_source=chatgpt.com (Obesity and overweight, 2025)
+"BMI is a surrogate marker of fatness and additional measurements, such as waist circumference, can help the diagnosis of obesity." Señala que ICM con la medición de la cintura se usan en conjunto para diagnosticar obesidad.
+
+
+```{r}
+predictor_seleccionado <- "Waist.Girth"
+```
