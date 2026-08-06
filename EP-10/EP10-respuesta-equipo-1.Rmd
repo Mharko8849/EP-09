@@ -102,7 +102,7 @@ En primer lugar, pensamos en la circunferencia de la cintura como un buen predic
 Nos dice que: "Waist circumference and waist–hip ratio were correlated with BMI, but the level of association varied, suggesting that these measures may provide different information and thus may not be interchangeable." Esto indica que se observó un nivel de correlación.
 
 Luego tenemos artículos como:
-- https://www.who.int/en/news-room/fact-sheets/detail/obesity-and-overweight?utm_source=chatgpt.com (Obesity and overweight, 2025)
+- https://www.who.int/en/news-room/fact-sheets/detail/obesity-and-overweight (Obesity and overweight, 2025)
 "BMI is a surrogate marker of fatness and additional measurements, such as waist circumference, can help the diagnosis of obesity." Señala que IMC con la medición de la cintura se usan en conjunto para diagnosticar obesidad.
 
 
@@ -187,9 +187,10 @@ Cabe destacar que, individualmente, `Knees.diameter` ($p = 0{,}093$) y `Bitrocha
 
 ## 6.
 
-### 6.1 Condiciones
 
 Evaluar la confiabilidad y generalidad de los modelos (i.e. que tengan un buen nivel de ajuste, que cumplen las condiciones para RLogit y no están dominados por casos sobreinfluyentes) y “arreglarlos” en caso de que tengan algún problema.
+
+### 6.1 Condiciones
 
 **Condición 1: relación lineal entre los predictores y la respuesta transformada.**
 
