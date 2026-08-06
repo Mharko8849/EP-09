@@ -1,14 +1,5 @@
 ---
 title: "EP10: Regresión logística"
-subtitle: "Inferencia y modelos estadísticos"
-author: "Equipo 1"
-date: "`r format(Sys.Date(), '%d de %B de %Y')`"
-output:
-  html_document:
-    toc: true
-    toc_depth: 2
-    number_sections: true
-    df_print: kable
 ---
 
 ```{r setup, include = FALSE}
@@ -29,48 +20,48 @@ library(car)
 ```{r}
 semilla       <- 5622   # la misma semilla usada en el EP09
 
-datos <- read.csv2("EP09 Datos.csv", stringsAsFactors = FALSE)
+datos <- read.csv2("../EP-09/EP09 Datos.csv", stringsAsFactors = FALSE)
 
 cat(sprintf("%d observaciones, %d variables\n", nrow(datos), ncol(datos)))
 print(colnames(datos))
 ```
 
-Para este ejercicio usaremos los datos de medidas anatómicas recolectados por Heinz et al. (2003) que ya conocimos en el ejercicio práctico anterior (disponibles en el archivo "EP09 Datos.csv"). Como en este case se requiere de una variable dicotómica, vamos a realizar lo siguiente:
+Para este ejercicio usaremos los datos de medidas anatómicas recolectados por Heinz. Como en este caso se requiere de una variable dicotómica, vamos a realizar lo siguiente:
 
-  1. El equipo crea la variable IMC (índice de masa corporal) como el peso de una persona (en kilogramos) dividida por el cuadrado de su estatura (en metros).
+  1. Se crea la variable IMC (índice de masa corporal) como el peso de una persona (en kilogramos) dividida por el cuadrado de su estatura (en metros).
   
-  2. Si bien esta variable se usa para clasificar a las personas en varias clases de estado nutricional (bajo peso, normal, sobrepeso, obesidad, obesidad mórbida), para      efectos de este ejercicio, usaremos dos clases: sobrepeso (IMC ≥ 23,2) y no sobrepeso (IMC < 23,2).
+  2. Para efectos de este ejercicio, usaremos dos clases: sobrepeso (IMC ≥ 23,2) y no sobrepeso (IMC < 23,2).
   
-  3. El equipo crea la variable dicotómica EN (estado nutricional) de acuerdo al valor de IMC de cada persona.
+  3. Se crea la variable dicotómica EN (estado nutricional) de acuerdo al valor de IMC de cada persona.
   
 ```{r}
 datos <- datos |>
-  # Creamos la variable IMC, pasando cm a metro y usando la formula clásica. Luego agregamos la var dicotomia EN.
+  # Se crea la variable IMC, pasando cm a metro y usando la fórmula clásica. Luego agregamos la variable dicotomia EN.
   mutate(IMC = Weight / (Height / 100) ** 2, EN  = factor(ifelse(IMC >= 23.2, "sobrepeso", "no_sobrepeso"), levels = c("no_sobrepeso", "sobrepeso")))
 
 print(head(datos |> select(Age, Weight, Height, Gender, IMC, EN)))
 ```
-Se observa que la creación de las columnas y sus valores son satisfactorios.
+Se observa que la creación de las columnas y sus valores.
 
-Ahora podemos construir un modelo de regresión logística para predecir la variable EN, de acuerdo con las siguientes instrucciones:
+Se procede con la construcción de un modelo de regresión logística para predecir la variable EN, de acuerdo con las siguientes instrucciones:
 
 ## 1.
-
-#### Asegurando reproducibilidad, seleccionar una muestra de 150 mujeres (si su n° de equipo es un número par) o 150 hombres (si su n° de equipo es impar), asegurando que la mitad tenga estado nutricional “sobrepeso” y la otra mitad “no sobrepeso” en cada caso. Dividir esta muestra en dos conjuntos: los datos de 100 personas (50 con EN “sobrepeso”) para utilizar en la construcción de los modelos y 50 personas (25 con EN “sobrepeso”) para poder evaluarlos.
+Asegurando reproducibilidad, seleccionar una muestra de 150 mujeres (si su n° de equipo es un número par) o 150 hombres (si su n° de equipo es impar), asegurando que la mitad tenga estado nutricional “sobrepeso” y la otra mitad “no sobrepeso” en cada caso. Dividir esta muestra en dos conjuntos: los datos de 100 personas (50 con EN “sobrepeso”) para utilizar en la construcción de los modelos y 50 personas (25 con EN “sobrepeso”) para poder evaluarlos.
 ```{r}
-#Equipos impares trabajan con hombres, pares con mujeres. Siendo equipo 1 trabajamos con mujeres (0 en columna Gender)
-genero <- 0 #(mujeres)
-datos_mujeres<- datos |> filter(Gender == genero)
-print(table(datos_mujeres[["EN"]]))   # verificar que hay al menos 75 de cada clase
+#Equipos impares trabajan con hombres, pares con mujeres. Siendo equipo 1 (impar) trabajamos con hombres (1 en columna Gender)
+genero <- 1 #(hombres)
+datos_hombres <- datos |> filter(Gender == genero)
+print(table(datos_hombres[["EN"]]))   # verificar que hay al menos 75 de cada clase
 ```
 
 ```{r}
 semilla       <- 5622   # la misma semilla usada en el EP09
+set.seed(semilla)       # aseguramos la reproducibilidad del muestreo
 
 #mitad con sobrepeso
-muestra_sp <- datos_mujeres |> filter(EN == "sobrepeso")    |> slice_sample(n = 75)
+muestra_sp <- datos_hombres |> filter(EN == "sobrepeso")    |> slice_sample(n = 75)
 #mitad sin sobrepeso
-muestra_ns <- datos_mujeres |> filter(EN == "no_sobrepeso") |> slice_sample(n = 75)
+muestra_ns <- datos_hombres |> filter(EN == "no_sobrepeso") |> slice_sample(n = 75)
 
 #Conjunto 1: datos de entrenamiento, 100 personas (50 con sobrepeso, 50 sin sobrepeso)
 datos_ent <- rbind(muestra_sp[1:50, ], muestra_ns[1:50, ])
@@ -87,7 +78,7 @@ cat("Prueba:\n");        print(table(datos_pru[["EN"]]))
 
 ## 2.
 
-#### Recordar las ocho posibles variables predictoras seleccionadas de forma aleatoria en el ejercicio anterior.
+Recordar las ocho posibles variables predictoras seleccionadas de forma aleatoria en el ejercicio anterior.
 
 ```{r}
 # variables predictoras seleccionadas al azar en el EP09
@@ -97,7 +88,7 @@ predictores <- c("Chest.Girth", "Bicep.Girth", "Calf.Maximum.Girth", "Hip.Girth"
 
 ## 3.
 
-#### Seleccionar, de las otras variables, una que el equipo considere que podría ser útil para predecir la clase EN, justificando bien esta selección (idealmente con literatura).
+Seleccionar, de las otras variables, una que el equipo considere que podría ser útil para predecir la clase EN, justificando bien esta selección (idealmente con literatura).
 
 
 En primer lugar, pensamos en la circunferencia de la cintura como un buen predictor del ICM. Para comprobar nuestra decisión investigamos en la literaruta, nos encontramos con varios infogramas y artículos y terminamos en el siguiente artículo de la OMS que confirma nuestra selección:
@@ -113,3 +104,167 @@ Luego tenemos artículos como:
 ```{r}
 predictor_seleccionado <- "Waist.Girth"
 ```
+
+## 4.
+
+Usando el entorno R y paquetes estándares, con el predictor seleccionado en el paso 3, construir un modelo de regresión logística simple (RLogitS) que prediga la variable EN.
+
+```{r}
+RLogitS <- glm(EN ~ Waist.Girth, data = datos_ent, family = binomial(link = "logit"))
+print(summary(RLogitS))
+```
+
+```{r}
+# Interpretamos los coeficientes en escala de Odds Ratio (OR), exponenciando los coeficientes originales (escala logit)
+cat("Odds Ratio (OR):\n")
+print(exp(coef(RLogitS)))
+
+cat("\nIntervalos de confianza al 95% para los OR:\n")
+print(exp(confint(RLogitS)))
+```
+
+El modelo ajustado es $logit(p) = -24{,}843 + 0{,}306 \cdot \text{Waist.Girth}$, donde $p$ es la probabilidad de tener EN "sobrepeso". El coeficiente de `Waist.Girth` es significativo ($p < 0{,}001$), lo que indica que la circunferencia de cintura aporta información relevante para predecir el estado nutricional.
+
+En escala de Odds Ratio, $\exp(0{,}306) = 1{,}358$: por cada centímetro adicional de circunferencia de cintura, las chances (*odds*) de que la persona tenga sobrepeso se multiplican por 1,358, es decir, aumentan aproximadamente un 35,8%. El intervalo de confianza al 95% para este OR es [1,219; 1,560], que no incluye el 1, confirmando que el efecto es significativo. El modelo reduce la devianza nula de 138,63 a 83,47 (con solo 1 predictor), lo que corresponde a un pseudo-$R^2$ de McFadden de 0,398, un ajuste razonable considerando que se trata de una única variable.
+
+## 5.
+
+Usando herramientas estándares para la exploración de modelos del entorno R, buscar entre dos y cinco predictores de entre las ocho variables seleccionadas al azar en el paso 2, para agregar al modelo de regresión logística simple obtenido en el paso 4, construyendo así un modelo de regresión logística múltiple (RLogitM).
+
+```{r}
+# Formula con todos los predictores candidatos: las 8 variables sorteadas en el EP09, sumadas a Waist.Girth
+fmla_completa   <- as.formula(paste("EN ~ Waist.Girth +", paste(predictores, collapse = " + ")))
+modelo_completo <- glm(fmla_completa, data = datos_ent, family = binomial(link = "logit"))
+
+# Búsqueda paso a paso hacia adelante, basada en AIC, partiendo del modelo simple (RLogitS)
+# y permitiendo incorporar hasta las 8 variables candidatas.
+modelo_step <- step(RLogitS, scope = list(lower = RLogitS, upper = modelo_completo),
+                     direction = "forward", trace = 1)
+```
+
+```{r}
+RLogitM <- modelo_step
+print(summary(RLogitM))
+
+cat("\nOdds Ratio (OR):\n")
+print(exp(coef(RLogitM)))
+```
+
+La búsqueda hacia adelante basada en AIC agrega, en orden, `Calf.Maximum.Girth`, `Bicep.Girth`, `Wrists.diameter`, `Knees.diameter` y `Bitrochanteric.diameter`, deteniéndose cuando ninguna variable adicional logra reducir más el AIC (72,55). El modelo `RLogitM` resultante incorpora 5 predictores adicionales a `Waist.Girth`, cumpliendo con el rango de 2 a 5 solicitado por el enunciado.
+
+```{r}
+# Comparamos ambos modelos formalmente con una prueba de razón de verosimilitudes (LRT)
+print(anova(RLogitS, RLogitM, test = "LRT"))
+```
+
+La comparación mediante LRT confirma que el bloque de 5 predictores adicionales mejora significativamente el ajuste respecto del modelo simple ($\Delta Deviance = 24{,}92$, $df = 5$, $p < 0{,}001$). La devianza residual baja de 83,47 (RLogitS) a 58,55 (RLogitM), lo que equivale a un pseudo-$R^2$ de McFadden de 0,578.
+
+Cabe destacar que, individualmente, `Knees.diameter` ($p = 0{,}093$) y `Bitrochanteric.diameter` ($p = 0{,}104$) no alcanzan significación al 5%. Sin embargo, se mantienen en el modelo porque (a) su aporte conjunto sí es significativo según la prueba LRT recién realizada, y (b) el criterio AIC favorece conservarlos: al eliminar `Bitrochanteric.diameter` el AIC sube de 72,55 a 73,37. Este punto se retoma en el análisis de confiabilidad del siguiente paso.
+
+## 6.
+
+Evaluar la confiabilidad de los modelos obtenidos, revisando la multicolinealidad entre los predictores y la presencia de casos atípicos o sobreinfluyentes, y aplicar las correcciones que correspondan.
+
+**Multicolinealidad (VIF)**
+
+```{r}
+cat("Factores de inflación de la varianza (VIF) — RLogitM:\n")
+print(vif(RLogitM))
+```
+
+Todos los VIF de `RLogitM` son inferiores a 2 (el máximo es 1,625 para `Wrists.diameter`), muy por debajo del umbral habitual de preocupación (VIF > 5 o 10). Esto indica que no existe multicolinealidad problemática entre los predictores del modelo múltiple: cada uno aporta información relativamente independiente sobre la variable EN. (`RLogitS` no se evalúa porque tiene un único predictor.)
+
+**Casos atípicos e influyentes (distancia de Cook)**
+
+```{r, fig.width = 7, fig.height = 3.5}
+cook_s <- cooks.distance(RLogitS)
+cook_m <- cooks.distance(RLogitM)
+
+umbral_cook <- 4 / nrow(datos_ent)   # criterio conservador habitual para RLogit (4/n)
+
+cat("RLogitS -- distancia de Cook máxima:", round(max(cook_s), 3),
+    " | casos sobre 4/n =", round(umbral_cook, 3), ":", sum(cook_s > umbral_cook), "\n")
+cat("RLogitM -- distancia de Cook máxima:", round(max(cook_m), 3),
+    " | casos sobre 4/n =", round(umbral_cook, 3), ":", sum(cook_m > umbral_cook), "\n")
+
+par(mfrow = c(1, 2))
+plot(cook_s, type = "h", main = "Distancia de Cook - RLogitS", ylab = "Distancia de Cook", ylim = c(0, 1))
+abline(h = 1, col = "red", lty = 2)
+plot(cook_m, type = "h", main = "Distancia de Cook - RLogitM", ylab = "Distancia de Cook", ylim = c(0, 1))
+abline(h = 1, col = "red", lty = 2)
+```
+
+Usando el criterio clásico de Cook (valores mayores a 1 requieren investigación, línea roja en los gráficos), ningún caso resulta problemático en ninguno de los dos modelos: la distancia de Cook máxima es 0,125 en `RLogitS` y 0,201 en `RLogitM`. Con el criterio más conservador de $4/n$ (0,04 para $n=100$) se identifican 5 observaciones "moderadamente influyentes" en `RLogitS` y 7 en `RLogitM`, pero ninguna se acerca al umbral de 1, por lo que no representan una amenaza real para las estimaciones de los modelos. **No se requiere eliminar casos ni aplicar ninguna corrección.**
+
+## 7.
+
+#### Evaluar la generalidad de los modelos verificando la independencia de los residuos (prueba de Durbin-Watson) y comentar si es necesario aplicar alguna corrección adicional.
+
+```{r}
+cat("RLogitS:\n"); print(durbinWatsonTest(RLogitS))
+cat("\nRLogitM:\n"); print(durbinWatsonTest(RLogitM))
+```
+
+En ambos modelos el estadístico de Durbin-Watson se sitúa cerca de 2 (1,872 en `RLogitS`; 1,732 en `RLogitM`) y las pruebas no son significativas ($p = 0{,}536$ y $p = 0{,}22$, respectivamente), por lo que no hay evidencia de autocorrelación entre los residuos. Esto es esperable, ya que las observaciones de `datos_ent` fueron mezcladas aleatoriamente (`slice_sample(prop = 1)`) y no existe un orden temporal o espacial que pudiera generar dependencia entre ellas.
+
+En síntesis, ambos modelos cumplen satisfactoriamente las condiciones de confiabilidad revisadas (ausencia de multicolinealidad relevante, sin casos sobreinfluyentes y residuos independientes), por lo que se mantienen sin modificaciones para la evaluación de su poder predictivo en el paso siguiente.
+
+## 8.
+
+Usando código estándar, evaluar el poder predictivo de `RLogitS` y `RLogitM` con los datos de las 50 personas del conjunto de prueba que no se utilizaron en la construcción de los modelos, mediante matriz de confusión, sensibilidad, especificidad, curva ROC y AUC.
+
+```{r}
+umbral <- 0.5   # umbral estándar de clasificación
+
+# Probabilidades predichas por cada modelo sobre el conjunto de prueba (datos no vistos)
+prob_s <- predict(RLogitS, datos_pru, type = "response")
+prob_m <- predict(RLogitM, datos_pru, type = "response")
+
+# Clases predichas aplicando el umbral de clasificación
+pred_s <- factor(ifelse(prob_s >= umbral, "sobrepeso", "no_sobrepeso"), levels = levels(datos_pru[["EN"]]))
+pred_m <- factor(ifelse(prob_m >= umbral, "sobrepeso", "no_sobrepeso"), levels = levels(datos_pru[["EN"]]))
+```
+
+```{r}
+cat("== Matriz de confusión — RLogitS ==\n")
+cm_s <- confusionMatrix(pred_s, datos_pru[["EN"]], positive = "sobrepeso")
+print(cm_s)
+```
+
+```{r}
+cat("== Matriz de confusión — RLogitM ==\n")
+cm_m <- confusionMatrix(pred_m, datos_pru[["EN"]], positive = "sobrepeso")
+print(cm_m)
+```
+
+Sobre el conjunto de prueba (25 casos "sobrepeso" y 25 "no_sobrepeso"), `RLogitS` clasifica correctamente 39 de 50 casos: exactitud de 0,78 (IC 95% [0,640; 0,885]), sensibilidad de 0,80 y especificidad de 0,76. `RLogitM` clasifica correctamente 44 de 50 casos: exactitud de 0,88 (IC 95% [0,757; 0,955]), con sensibilidad y especificidad iguales a 0,88. El modelo múltiple mejora tanto la detección de personas con sobrepeso (sensibilidad) como el descarte correcto de quienes no lo tienen (especificidad).
+
+```{r, fig.width = 6, fig.height = 5}
+# Curvas ROC y AUC de ambos modelos sobre el conjunto de prueba
+roc_s <- roc(datos_pru[["EN"]], prob_s, levels = c("no_sobrepeso", "sobrepeso"), direction = "<")
+roc_m <- roc(datos_pru[["EN"]], prob_m, levels = c("no_sobrepeso", "sobrepeso"), direction = "<")
+
+cat("AUC RLogitS:", round(auc(roc_s), 3), " | IC 95%:", round(ci.auc(roc_s), 3), "\n")
+cat("AUC RLogitM:", round(auc(roc_m), 3), " | IC 95%:", round(ci.auc(roc_m), 3), "\n")
+
+ggroc(list(RLogitS = roc_s, RLogitM = roc_m), legacy.axes = TRUE, size = 0.9) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey60") +
+  labs(title = "Curvas ROC en el conjunto de prueba", x = "1 - Especificidad", y = "Sensibilidad", color = "Modelo") +
+  theme_minimal()
+```
+
+El área bajo la curva ROC (AUC) confirma la superioridad de `RLogitM`: 0,926 (IC 95% [0,853; 1,000]) frente a 0,834 (IC 95% [0,715; 0,954]) de `RLogitS`. La curva de `RLogitM` domina visualmente a la de `RLogitS` en casi todo el rango, indicando que, para cualquier nivel de especificidad exigido, el modelo múltiple logra mayor sensibilidad. Ambos modelos discriminan claramente mejor que el azar (AUC = 0,5), pero `RLogitM` lo hace con un margen amplio y consistente con las demás métricas.
+
+## Conclusión
+
+El modelo de regresión logística simple (`RLogitS`), construido únicamente con `Waist.Girth`, confirma la elección hecha en el paso 3 a partir de la literatura: la circunferencia de cintura por sí sola es un predictor significativo del estado nutricional (OR = 1,358 por cada cm adicional; $p < 0{,}001$), con un ajuste razonable (pseudo-$R^2$ = 0,398) y un desempeño predictivo aceptable en el conjunto de prueba (exactitud = 0,78; AUC = 0,834).
+
+El modelo múltiple (RLogitM), que agrega Calf.Maximum.Girth, Bicep.Girth, Wrists.diameter, Knees.diameter y Bitrochanteric.diameter mediante selección paso a paso basada en AIC, mejora de forma clara y consistente en las tres dimensiones evaluadas:
+
+- Se reduce la devianza residual de 83,47 a 58,55 (LRT: $p < 0{,}001$) y sube el pseudo-$R^2$ de McFadden de 0,398 a 0,578.
+- No se presentan problemas de multicolinealidad (todos los VIF < 2), no tiene casos sobreinfluyentes (distancia de Cook máxima de 0,201, muy por debajo de 1) y sus residuos son independientes (Durbin-Watson, $p = 0{,}22$), es decir, cumple las mismas condiciones de confiabilidad que el modelo simple sin requerir ninguna corrección.
+- El conjunto de prueba aumenta la exactitud de 0,78 a 0,88, la sensibilidad y especificidad de 0,80/0,76 a 0,88/0,88, y el AUC de 0,834 a 0,926.
+
+La única observación relevante es que dos de los cinco predictores agregados (Knees.diameter y Bitrochanteric.diameter) no son individualmente significativos al 5%, aunque su aporte conjunto sí lo es y el criterio AIC favorece mantenerlos. Esto sugiere que su efecto podría no ser tan robusto como el de las demás variables y sería recomendable confirmarlo con una muestra mayor.
+
+En definitiva, agregar predictores adicionales a Waist.Girth mediante un procedimiento sistemático (selección hacia adelante basada en AIC) produjo un modelo más complejo, pero también más preciso y con el mismo nivel de confiabilidad que el modelo simple. Para efectos de predicción del estado nutricional a partir de medidas antropométricas, RLogitM es el modelo recomendado por este equipo.
