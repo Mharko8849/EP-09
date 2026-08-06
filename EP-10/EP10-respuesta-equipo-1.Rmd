@@ -42,12 +42,12 @@ Para este ejercicio usaremos los datos de medidas anatómicas recolectados por H
   
 ```{r}
 datos <- datos |>
-  # Se crea la variable IMC, pasando cm a metro y usando la fórmula clásica. Luego agregamos la variable dicotomia EN.
+  # Se crea la variable IMC, pasando cm a metro y usando la fórmula clásica. Luego agregamos la variable dicotómica EN.
   mutate(IMC = Weight / (Height / 100) ** 2, EN  = factor(ifelse(IMC >= 23.2, "sobrepeso", "no_sobrepeso"), levels = c("no_sobrepeso", "sobrepeso")))
 
 print(head(datos |> select(Age, Weight, Height, Gender, IMC, EN)))
 ```
-Se observa que la creación de las columnas y sus valores.
+Se observa la creación de las columnas y sus valores.
 
 Se procede con la construcción de un modelo de regresión logística para predecir la variable EN, de acuerdo con las siguientes instrucciones:
 
