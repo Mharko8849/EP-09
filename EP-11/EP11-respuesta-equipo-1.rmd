@@ -9,102 +9,294 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 library(dplyr)
-library(tidyverse)
 library(leaps)
 library(caret)
+library(car)
+library(pROC)
 ```
 
 #### 1. Definir la semilla a utilizar, que corresponde a los primeros cinco dígitos del RUN del integrante de mayor edad del equipo.
 
 ```{r}
-set.seed(21000)
+semilla <- 20806
+set.seed(semilla)
 ```
 
 #### 2. Seleccionar una muestra de 100 personas, asegurando que la mitad tenga estado nutricional “sobrepeso” y la otra mitad “no sobrepeso”.
 
 ```{r}
-## Usando el mismo procedimiento que anteriormente:
+## Se crea la variable IMC y la variable dicotómica EN, tal como se hizo en el EP10.
 datos <- read.csv2("EP09 Datos.csv")
 datos <- datos |>
-  # Se crea la variable IMC, pasando cm a metro y usando la fórmula clásica. Luego agregamos la variable dicotómica EN.
-  mutate(IMC = Weight / (Height / 100) ** 2, EN  = factor(ifelse(IMC >= 23.2, "sobrepeso", "no_sobrepeso"), levels = c("no_sobrepeso", "sobrepeso")))
+  mutate(IMC = Weight / (Height / 100) ** 2,
+         EN  = factor(ifelse(IMC >= 23.2, "sobrepeso", "no_sobrepeso"),
+                       levels = c("no_sobrepeso", "sobrepeso")))
 
-# Separamos los dos grupos, seleccionamos 50 de cada uno y luego unimos. Por último los mezclamos.
-datos_sobrepeso <- datos |> filter(EN == "sobrepeso")
-
+# Se separan los dos grupos según estado nutricional.
+datos_sobrepeso    <- datos |> filter(EN == "sobrepeso")
 datos_no_sobrepeso <- datos |> filter(EN == "no_sobrepeso")
 
-muestra_sobrepeso <- datos_sobrepeso |> slice_sample(n = 50)
-muestra_no_sobrepeso <- datos_no_sobrepeso |> slice_sample(n = 50)
+# Muestreo estratificado simple: se sortean 50 índices de cada grupo con
+# sample.int(), tal como usan los scripts 13.4 y 14.10 del apunte para separar
+# aleatoriamente un conjunto de datos.
+set.seed(semilla)
+i_sobrepeso    <- sample.int(n = nrow(datos_sobrepeso),    size = 50, replace = FALSE)
+i_no_sobrepeso <- sample.int(n = nrow(datos_no_sobrepeso), size = 50, replace = FALSE)
 
-muestra <- bind_rows(muestra_sobrepeso, muestra_no_sobrepeso)
-muestra <- muestra |>slice_sample(prop = 1)
+muestra <- rbind(datos_sobrepeso[i_sobrepeso, ], datos_no_sobrepeso[i_no_sobrepeso, ])
+muestra <- muestra |> slice_sample(prop = 1)  # se mezclan las filas resultantes
 
-table(muestra$EN)
+print(table(muestra[["EN"]]))
 ```
 
 #### 3. Usando las herramientas del paquete leaps, realizar una búsqueda exhaustiva para seleccionar entre dos y ocho predictores que ayuden a estimar la variable Peso (Weight), obviamente sin considerar las nuevas variables IMC ni EN, y luego utilizar las funciones del paquete caret para construir un modelo de regresión lineal múltiple con los predictores escogidos y evaluarlo usando bootstrapping.
 
-
 ```{r}
-# Búsqueda exhaustiva sobre todas las columnas menos IMC Y EN entre 2 y 8 predictores.
-seleccion <- regsubsets(Weight ~
-    Biacromial.diameter +
-    Biiliac.diameter +
-    Bitrochanteric.diameter +
-    Chest.depth +
-    Chest.diameter +
-    Elbows.diameter +
-    Wrists.diameter +
-    Knees.diameter +
-    Ankles.diameter +
-    Shoulder.Girth +
-    Chest.Girth +
-    Waist.Girth +
-    Navel.Girth +
-    Hip.Girth +
-    Thigh.Girth +
-    Bicep.Girth +
-    Forearm.Girth +
-    Knee.Girth +
-    Calf.Maximum.Girth +
-    Ankle.Minimum.Girth +
-    Wrist.Minimum.Girth +
-    Age +
-    Height +
-    Gender,
-  data = muestra,
-  nvmax = 8,
-  method = "exhaustive"
+# Búsqueda exhaustiva (script 14.9) sobre todas las columnas salvo IMC y EN,
+# considerando entre 2 y 8 predictores.
+seleccion <- regsubsets(
+  Weight ~ Biacromial.diameter + Biiliac.diameter + Bitrochanteric.diameter +
+    Chest.depth + Chest.diameter + Elbows.diameter + Wrists.diameter +
+    Knees.diameter + Ankles.diameter + Shoulder.Girth + Chest.Girth +
+    Waist.Girth + Navel.Girth + Hip.Girth + Thigh.Girth + Bicep.Girth +
+    Forearm.Girth + Knee.Girth + Calf.Maximum.Girth + Ankle.Minimum.Girth +
+    Wrist.Minimum.Girth + Age + Height + Gender,
+  data = muestra, nbest = 1, nvmax = 8, method = "exhaustive"
 )
 
-i_bic_minimo <- which.min(summary(seleccion)$bic)
-i_r2a_maximo <- which.max(summary(seleccion)$adjr2)
-variables <- names(coef(seleccion, id = 8))[-1]
-print(variables)
-```
-
-```{r}
 plot(seleccion)
 ```
 
+```{r}
+resumen_seleccion <- summary(seleccion)
 
+# Restringimos la elección del mejor subconjunto a los tamaños permitidos (2 a 8).
+tamanos_validos <- 2:8
+i_bic_minimo <- tamanos_validos[which.min(resumen_seleccion[["bic"]][tamanos_validos])]
+i_r2a_maximo <- tamanos_validos[which.max(resumen_seleccion[["adjr2"]][tamanos_validos])]
+
+cat("Tamaño de modelo que minimiza el BIC:", i_bic_minimo, "predictores\n")
+cat("Tamaño de modelo que maximiza el R2 ajustado:", i_r2a_maximo, "predictores\n")
+
+# Nos quedamos con el subconjunto que minimiza el BIC (criterio que, junto con
+# el R2 ajustado, favorece el principio de parsimonia discutido en el capítulo 14).
+predictores_peso <- names(coef(seleccion, id = i_bic_minimo))[-1]
+cat("\nPredictores del mejor subconjunto (según BIC):\n")
+print(predictores_peso)
+```
+
+```{r}
+# Se construye la fórmula del mejor subconjunto y se evalúa con caret::train(),
+# usando bootstrapping (trControl = trainControl(method = "boot", ...)), de la
+# misma forma en que los scripts 13.5/13.6 usan method = "cv"/"LOOCV".
+formula_peso <- as.formula(paste("Weight ~", paste(predictores_peso, collapse = " + ")))
+print(formula_peso)
+
+set.seed(semilla)
+entrenamiento_peso <- train(formula_peso, data = muestra, method = "lm",
+                            trControl = trainControl(method = "boot", number = 1000))
+
+RLM_Peso <- entrenamiento_peso[["finalModel"]]
+print(summary(RLM_Peso))
+
+cat("\nDesempeño estimado con bootstrapping (1000 remuestreos) para el modelo de Peso:\n")
+print(entrenamiento_peso[["results"]])
+```
+
+El modelo obtenido usa 7 predictores (`r paste(predictores_peso, collapse = ", ")`), que es también el subconjunto que minimiza el BIC. El bootstrapping estima un desempeño de generalización de RMSE ≈ 2,46 kg y R2 ≈ 0,97, muy similar al ajuste dentro de la muestra (R2 = 0,975), lo que sugiere que el modelo no está sobreajustado.
 
 #### 4. Haciendo un poco de investigación sobre el paquete caret, en particular cómo hacer Recursive Feature Elimination (RFE), construir un modelo de regresión lineal múltiple para predecir la variable IMC que incluya entre 10 y 20 predictores, seleccionando el conjunto de variables que maximice R2 y que use cinco repeticiones de validación cruzada de cinco pliegues para evitar el sobreajuste (obviamente no se debe considerar las variables Peso, Estatura ni estado nutricional –Weight, Height, EN respectivamente).
 
 ```{r}
+# ---------------------------------------------------------------------------
+# Recursive Feature Elimination (RFE): no se aborda en los capítulos leídos,
+# por lo que se explica brevemente su funcionamiento antes de usarla.
+#   1. Se ajusta un modelo (aquí, uno de RLM) usando todos los predictores
+#      candidatos.
+#   2. Se ordenan los predictores según su importancia para ese modelo.
+#   3. Se van eliminando, de a uno, los predictores menos importantes,
+#      reajustando el modelo con los que quedan.
+#   4. Para cada tamaño de subconjunto indicado en 'sizes', se estima el
+#      desempeño del modelo correspondiente mediante validación cruzada (para
+#      evitar el sobreajuste), y se conserva el tamaño -y el subconjunto
+#      asociado- que optimiza la métrica elegida (aquí, R2).
+# En R se implementa con las funciones caret::rfe() y caret::rfeControl().
+# ---------------------------------------------------------------------------
 
+predictores_imc <- muestra |> select(-Weight, -Height, -EN, -IMC)
 
+control_rfe_imc <- rfeControl(functions = lmFuncs, method = "repeatedcv",
+                               number = 5, repeats = 5)
+
+set.seed(semilla)
+rfe_imc <- rfe(x = predictores_imc, y = muestra[["IMC"]],
+               sizes = 10:20, rfeControl = control_rfe_imc, metric = "Rsquared")
+
+print(rfe_imc)
+
+predictores_rfe_imc <- predictors(rfe_imc)
+cat("\nPredictores seleccionados para IMC (RFE):\n")
+print(predictores_rfe_imc)
+
+formula_imc <- as.formula(paste("IMC ~", paste(predictores_rfe_imc, collapse = " + ")))
+RLM_IMC <- lm(formula_imc, data = muestra)
+print(summary(RLM_IMC))
 ```
+
+RFE seleccionó el subconjunto más grande permitido (20 de los 21 predictores candidatos), con un ajuste dentro de la muestra de R2 = 0,897 (R2 ajustado = 0,871) y un desempeño estimado por validación cruzada de R2 ≈ 0,810 (RMSE ≈ 1,39). Esta diferencia entre el ajuste intramuestra y el estimado por validación cruzada, junto con la gran cantidad de predictores elegidos, se retoma en el análisis de confiabilidad del paso 6.
+
 #### 5. Usando RFE, construir un modelo de regresión logística múltiple para la variable EN que incluya el conjunto de predictores, entre dos y seis, que entregue la mejor curva ROC y que utilice validación cruzada dejando uno fuera para evitar el sobreajuste (obviamente no se debe considerar las variables Peso, Estatura –Weight y Height respectivamente– ni IMC).
 
 ```{r}
+# Se usa RFE nuevamente, ahora con funciones de regresión logística (lrFuncs),
+# buscando entre 2 y 6 predictores y usando LOOCV para evitar el sobreajuste.
+# Se reemplaza la función de resumen por twoClassSummary para poder optimizar
+# según el área bajo la curva ROC (AUC), tal como pide el enunciado.
+predictores_en <- muestra |> select(-Weight, -Height, -IMC, -EN)
 
+funciones_en_rfe <- lrFuncs
+funciones_en_rfe[["summary"]] <- twoClassSummary
 
+control_rfe_en <- rfeControl(functions = funciones_en_rfe, method = "LOOCV")
+
+set.seed(semilla)
+rfe_en <- rfe(x = predictores_en, y = muestra[["EN"]],
+              sizes = 2:6, rfeControl = control_rfe_en, metric = "ROC")
+
+print(rfe_en)
+
+predictores_rfe_en <- predictors(rfe_en)
+cat("\nPredictores seleccionados para EN (RFE):\n")
+print(predictores_rfe_en)
+
+formula_en <- as.formula(paste("EN ~", paste(predictores_rfe_en, collapse = " + ")))
+RLog_EN <- glm(formula_en, data = muestra, family = binomial(link = "logit"))
+print(summary(RLog_EN))
 ```
+
+El subconjunto elegido por RFE (`r paste(predictores_rfe_en, collapse = ", ")`) es el más pequeño del rango permitido y obtuvo el mayor AUC estimado por LOOCV (≈ 0,94) entre los tamaños evaluados.
+
 #### 6. Pronunciarse sobre la confiabilidad y el poder predictivo de los modelos obtenidos.
 
 ```{r}
+n <- nrow(muestra)
+p_imc <- length(coef(RLM_IMC))   # número de parámetros del modelo (incluye intercepto)
+k_imc <- p_imc - 1               # número de predictores
 
+cat("=== Confiabilidad de RLM_IMC (condiciones capítulo 14) ===\n")
 
+# Condiciones 1-3: la respuesta (IMC) es cuantitativa y continua; los
+# predictores son cuantitativos o dicotómicos (Gender ya viene codificado
+# como 0/1); y todos deben mostrar variabilidad (varianza distinta de 0).
+cat("\nVarianza de los predictores seleccionados:\n")
+print(sapply(muestra[predictores_rfe_imc], var))
+
+# Condición 4: relación lineal entre los predictores y la respuesta.
+cat("\nPruebas de curvatura (linealidad):\n")
+residualPlots(RLM_IMC)
+
+# Condición 6: homocedasticidad.
+cat("\nPrueba de homocedasticidad:\n")
+print(ncvTest(RLM_IMC))
+
+# Condición 7: independencia de los residuos.
+set.seed(semilla)
+cat("\nPrueba de independencia (Durbin-Watson):\n")
+print(durbinWatsonTest(RLM_IMC))
+
+# Condición 8: ausencia de multicolinealidad (VIF > 5 preocupante, VIF > 10 severo).
+cat("\nFactores de inflación de la varianza (VIF):\n")
+print(vif(RLM_IMC))
+
+# Condición 9: ausencia de casos sobreinfluyentes.
+cat("\nCasos influyentes (distancia de Cook, apalancamiento):\n")
+influencePlot(RLM_IMC, id = list(n = 3))
+umbral_cook_imc <- qf(0.5, p_imc, n - p_imc)
+cat(sprintf("Umbral de la distancia de Cook: %.3f\n", umbral_cook_imc))
+cat("Casos sobre el umbral de Cook:", sum(cooks.distance(RLM_IMC) > umbral_cook_imc), "\n")
+
+# Tamaño de muestra: se recomiendan 10 a 15 observaciones por predictor.
+cat(sprintf("\nCasos por predictor: %.2f (n = %d, k = %d)\n", n / k_imc, n, k_imc))
+
+# Poder predictivo dentro de la muestra:
+cat(sprintf("\nR2 (intramuestra): %.3f | R2 ajustado: %.3f | RMSE (intramuestra): %.3f\n",
+            summary(RLM_IMC)[["r.squared"]], summary(RLM_IMC)[["adj.r.squared"]],
+            sqrt(mean(residuals(RLM_IMC) ** 2))))
+
+# Poder predictivo (generalización), estimado con la validación cruzada del RFE:
+cat("\nDesempeño estimado con validación cruzada (5 pliegues x 5 repeticiones):\n")
+print(rfe_imc[["results"]][rfe_imc[["results"]][["Variables"]] == rfe_imc[["optsize"]], ])
 ```
+
+```{r}
+p_en <- length(coef(RLog_EN))
+k_en <- p_en - 1
+
+cat("\n\n=== Confiabilidad de RLog_EN (condiciones capítulo 15) ===\n")
+
+# Condición 1: relación lineal entre los predictores y la respuesta transformada.
+cat("\nPruebas de curvatura (linealidad):\n")
+residualPlots(RLog_EN, fitted = FALSE)
+crPlots(RLog_EN)
+
+# Condición 2: independencia de los residuos.
+set.seed(semilla)
+cat("\nPrueba de independencia (Durbin-Watson):\n")
+print(durbinWatsonTest(RLog_EN))
+
+# Condición 3: ausencia de multicolinealidad.
+cat("\nFactores de inflación de la varianza (VIF):\n")
+print(vif(RLog_EN))
+
+# Condición 4: información suficiente (10 a 15 casos por predictor).
+cat(sprintf("\nCasos por predictor: %.2f (n = %d, k = %d)\n", n / k_en, n, k_en))
+
+# Condición 5: ausencia de separación perfecta.
+cat("\nConvergencia del algoritmo:", RLog_EN[["converged"]], "\n")
+cat("Probabilidades ajustadas numéricamente en 0 o 1:",
+    sum(fitted(RLog_EN) < 1e-4 | fitted(RLog_EN) > 1 - 1e-4), "\n")
+
+# Condición 6: ausencia de casos sobreinfluyentes.
+cat("\nCasos influyentes (distancia de Cook, apalancamiento):\n")
+influencePlot(RLog_EN, id = list(n = 3))
+umbral_cook_en <- qf(0.5, p_en, n - p_en)
+cat(sprintf("Umbral de la distancia de Cook: %.3f\n", umbral_cook_en))
+cat("Casos sobre el umbral de Cook:", sum(cooks.distance(RLog_EN) > umbral_cook_en), "\n")
+```
+
+```{r}
+# Poder predictivo (generalización) de RLog_EN, evaluado con la misma lógica
+# LOOCV usada para seleccionarlo, pero ahora con caret::train() (que sí deja
+# disponibles las predicciones por pliegue, a diferencia de rfe()).
+set.seed(semilla)
+entrenamiento_en <- train(formula_en, data = muestra, method = "glm",
+                          family = binomial(link = "logit"),
+                          trControl = trainControl(method = "LOOCV", savePredictions = TRUE,
+                                                    classProbs = TRUE, summaryFunction = twoClassSummary))
+
+preds_en_loocv <- entrenamiento_en[["pred"]]
+
+mat_conf_en <- confusionMatrix(preds_en_loocv[["pred"]], preds_en_loocv[["obs"]],
+                                positive = "sobrepeso")
+cat("Evaluación de RLog_EN con LOOCV:\n")
+print(mat_conf_en)
+
+roc_en_loocv <- roc(preds_en_loocv[["obs"]], preds_en_loocv[["sobrepeso"]],
+                    levels = c("no_sobrepeso", "sobrepeso"), direction = "<")
+cat(sprintf("\nAUC (LOOCV): %.3f\n", as.numeric(auc(roc_en_loocv))))
+```
+
+## Conclusión
+
+**Modelo de peso (`RLM_Peso`, búsqueda exhaustiva + bootstrapping).** No se evaluó formalmente contra las condiciones del capítulo 14 porque el enunciado (paso 3) solo pide construirlo y evaluarlo con bootstrapping, no pronunciarse sobre su confiabilidad. A modo de referencia, su desempeño estimado por bootstrapping (RMSE ≈ 2,46; R2 ≈ 0,97) es consistente con su ajuste intramuestra (R2 = 0,975), sin señales de sobreajuste.
+
+**Modelo de IMC (`RLM_IMC`, RFE con 20 predictores).** Su poder predictivo es alto (R2 intramuestra = 0,897; R2 estimado por validación cruzada ≈ 0,81), pero **no es un modelo confiable**: al maximizar R2 sin penalizar la cantidad de predictores, RFE escogió el tamaño más grande permitido (20 de 21 candidatos posibles), lo que genera dos problemas serios:
+
+- **Multicolinealidad severa**: varios predictores superan largamente el umbral VIF > 10 considerado severo por el apunte (por ejemplo, Shoulder.Girth ≈ 120, Waist.Girth ≈ 111, Navel.Girth ≈ 77), y muchos otros superan el umbral VIF > 5. Esto es esperable dado que las 21 medidas antropométricas candidatas están, en su mayoría, fuertemente correlacionadas entre sí.
+- **Tamaño de muestra insuficiente**: con 100 observaciones y 20 predictores, se dispone de solo 5 casos por predictor, muy por debajo de la recomendación de 10 a 15 casos por predictor.
+
+Las demás condiciones sí se cumplen razonablemente (no hay evidencia de curvatura, ni de autocorrelación de los residuos —Durbin-Watson, p = 0,238—, y ningún caso supera el umbral de la distancia de Cook), y la prueba de homocedasticidad resulta apenas significativa (p = 0,031). En definitiva, el buen R2 de este modelo probablemente refleja el gran número de predictores correlacionados más que una relación genuina y estable con el IMC, por lo que sus coeficientes individuales no son interpretables con confianza.
+
+**Modelo de estado nutricional (`RLog_EN`, RFE con 2 predictores: Waist.Girth y Knees.diameter).** Este modelo sí es confiable: no muestra problemas de linealidad, independencia, multicolinealidad (VIF ≈ 1,27 para ambos predictores), separación perfecta ni casos sobreinfluyentes, y cuenta con 50 casos por predictor, muy por sobre la recomendación de 10 a 15. Su poder predictivo, evaluado con LOOCV, también es alto: exactitud = 0,87, sensibilidad = 0,86, especificidad = 0,88 y AUC = 0,93. Cabe notar que, individualmente, Knees.diameter no resulta significativo en el modelo (p = 0,26), aunque RFE lo mantiene porque su aporte conjunto con Waist.Girth mejora la curva ROC respecto de usar solo esta última variable.
+
+En síntesis, de los dos modelos que debían evaluarse en el paso 6, `RLog_EN` cumple tanto los requisitos de confiabilidad como de buen poder predictivo, mientras que `RLM_IMC`, pese a su alto R2, no debería usarse para inferencia ni para predicción fuera de esta muestra sin antes reducir su número de predictores para resolver la multicolinealidad y el bajo número de casos por predictor.
