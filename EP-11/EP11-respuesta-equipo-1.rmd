@@ -43,7 +43,7 @@ set.seed(20807)
 datos <- read.csv2("EP09 Datos.csv")
 
 # Se crea la variable IMC (pasando la estatura de cm a m) y, a partir de ella, la
-# variable dicotómica de estado nutricional EN usando el umbral 23,2 kg/m^2.
+# variable dicotómica de estado nutricional EN usando el umbral 23.2 kg/m^2.
 datos <- datos |>
   mutate(
     IMC = Weight / (Height / 100)**2,
@@ -145,7 +145,7 @@ influencePlot(modelo_lm)
 ```
 
 
-Respecto de las condiciones: los residuos son normales (Shapiro-Wilk, p = 0.6964) y homocedásticos (ncvTest, p = 0.17335). La prueba de Durbin-Watson queda en el límite (p = 0.04), por lo que la independencia de los residuos debe tomarse con cautela. En cuanto a linealidad, residualPlots() detecta curvatura significativa en Chest.Girth, Hip.Girth y Height (Tukey en el borde, p = 0,051): es el principal riesgo del modelo. 
+Respecto de las condiciones: los residuos son normales (Shapiro-Wilk, p = 0.6964) y homocedásticos (ncvTest, p = 0.17335). La prueba de Durbin-Watson queda en el límite (p = 0.04), por lo que la independencia de los residuos debe tomarse con cautela. En cuanto a linealidad, residualPlots() detecta curvatura significativa en Chest.Girth, Hip.Girth y Height (Tukey en el borde, p = 0.051): es el principal riesgo del modelo. 
 
 Hay multicolinealidad moderada entre las circunferencias del tronco y las piernas (VIF de Chest.Girth = 7.3; Waist.Girth = 5.9; Forearm.Girth = 5.4; Knee.Girth = 5.1, todos en la banda 5–10, ninguno severo >10), lo que no daña la predicción pero sí la interpretación individual de esos coeficientes.
 
@@ -191,7 +191,7 @@ cat("N° de predictores:", length(predictors(rfe_imc)), "\n")
 ```
 
 ```{r}
-#por ultimo, las condiciones
+#Por ultimo, las condiciones
 residualPlots(modelo_imc)         # linealidad
 ```
 ```{r}
@@ -210,10 +210,10 @@ vif(modelo_imc)                   #  multicolinealidad
 influencePlot(modelo_imc)         # casos influyentes
 ```
 
-RFE con 5×5 validación cruzada selecciona 18 predictores, con un $R^2$ validado de 0.793 y un RMSE de 1,57 kg/m2 ($R^2$ ajustado del ajuste final = 0.852). Sin embargo, la verificación de condiciones revela varios riesgos que se deben declarar:
+RFE con 5×5 validación cruzada selecciona 18 predictores, con un $R^2$ validado de 0.793 y un RMSE de 1.57 kg/m2 ($R^2$ ajustado del ajuste final = 0.854). Sin embargo, la verificación de condiciones revela varios riesgos que se deben declarar:
 la prueba de homocedasticidad es significativa (ncvTest, p = 0.014), es decir, la varianza de los residuos no es constante, y hay multicolinealidad severa (4 predictores con VIF > 10 y 13 con VIF > 5). Además, con 18 predictores para 100 observaciones se obtienen apenas 5.6 casos por predictor, muy por debajo de la regla de 10–15, lo que sobredimensiona el modelo. Los residuos sí son normales (Shapiro-Wilk, p = 0.41) e independientes (Durbin-Watson, p = 0.44). En suma, es un modelo con buen ajuste aparente pero poco confiable en sus supuestos y poco parsimonioso: usable para predecir con precaución, pero no para interpretar coeficientes.
 
-* Además,tener en cuenta que residualPlots() detecta curvatura significativa (Tukey p=0.015), por lo que la condición de linealidad tampoco se cumple del todo. Se reafirma el hecho de predecir con cautela.
+* Además,tener en cuenta que residualPlots() detecta curvatura significativa (Tukey p=0.011), por lo que la condición de linealidad tampoco se cumple del todo. Se reafirma el hecho de predecir con cautela.
 
 <br>
 
@@ -249,7 +249,7 @@ print(summary(modelo_en))
 ```
 
 ```{r}
-# --- Curva ROC y AUC en entrenamiento (§15.2) ---
+# --- Curva ROC y AUC en entrenamiento
 probs_en <- fitted(modelo_en)
 ROC_en <- roc(muestra[["EN"]], probs_en,
               levels = c("no_sobrepeso", "sobrepeso"), direction = "<")
@@ -257,7 +257,7 @@ cat("AUC entrenamiento:", round(ROC_en[["auc"]], 3), "\n")
 ```
 
 ```{r}
-# --- Matriz de confusión con umbral 0,5 (§15.2) ---
+# --- Matriz de confusión con umbral 0.5
 preds_en <- factor(ifelse(probs_en >= 0.5, "sobrepeso", "no_sobrepeso"),
                    levels = c("no_sobrepeso", "sobrepeso"))
 mat_conf <- confusionMatrix(preds_en, muestra[["EN"]], positive = "sobrepeso")
@@ -302,8 +302,8 @@ cat("  AUC =", round(mejor_en$ROC, 3),
 **Modelo de Peso (RLM con bootstrapping).** Es el más confiable y potente de los tres. Con 8 predictores explica cerca del 97% de la variabilidad del peso y comete un error típico de solo 2.17 kg estimado por bootstrapping (una técnica robusta que no depende de una única partición). Cumple normalidad
 (Shapiro p=0.70) y homocedasticidad. Su única debilidad es la multicolinealidad moderada (VIF de 5-7). Como predictor de peso, es plenamente utilizable.
 
-**Modelo de IMC (RLM con RFE).** Tiene un poder predictivo bueno pero claramente menor: explica alrededor del 79.3% de la variabilidad del IMC con un RMSE de 1,572 kg/m2. Es el más débil en supuestos: heterocedasticidad significativa, multicolinealidad severa (varios VIF>10) y solo 5.6 obs/predictor. Defendible para predecir, pero sobredimensionado.
+**Modelo de IMC (RLM con RFE).** Tiene un poder predictivo bueno pero claramente menor: explica alrededor del 79.3% de la variabilidad del IMC con un RMSE de 1.572 kg/m2. Es el más débil en supuestos: heterocedasticidad significativa, multicolinealidad severa (varios VIF>10) y solo 5.6 obs/predictor. Defendible para predecir, pero sobredimensionado.
 
-**Modelo de EN (RLog con RFE).** Como clasificador es muy bueno: un AUC validado por LOOCV de 0.922, con sensibilidad y especificidad cercanas a 0,90, indican que discrimina correctamente entre "sobrepeso" y "no sobrepeso" en datos no vistos. El modelo final de 5 predictores es parsimonioso, converge sin problemas y no presenta multicolinealidad (VIF < 3.2). La advertencia conceptual es que EN se deriva del tamaño corporal, por lo que predecirlo a partir de circunferencias y diámetros roza la separación perfecta; aun así, la evaluación con LOOCV respalda su confiabilidad y poder predictivo.
+**Modelo de EN (RLog con RFE).** Como clasificador es muy bueno: un AUC validado por LOOCV de 0.922, con sensibilidad y especificidad cercanas a 0.85, indican que discrimina correctamente entre "sobrepeso" y "no sobrepeso" en datos no vistos. El modelo final de 5 predictores es parsimonioso, converge sin problemas y no presenta multicolinealidad (VIF < 3.2). La advertencia conceptual es que EN se deriva del tamaño corporal, por lo que predecirlo a partir de circunferencias y diámetros roza la separación perfecta; aun así, la evaluación con LOOCV respalda su confiabilidad y poder predictivo.
 
 En conjunto, los tres modelos generalizan bien según sus respectivas técnicas de remuestreo. El de peso es el más sólido, el de IMC es potente pero poco parsimonioso, y el de estado nutricional logra una clasificación de alta calidad con muy pocos predictores.
